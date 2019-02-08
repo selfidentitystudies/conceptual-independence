@@ -11,6 +11,8 @@ output:
       toc_depth: 4
     code_folding: hide
     df_print: paged
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -21,18 +23,361 @@ require(here);
 
 ```{r}
 
-######################################################################
-### Paths
-######################################################################
+###-----------------------------------------------------------------------------
+### Paths and files
+###-----------------------------------------------------------------------------
 
 repoPath <- here::here();
-workingPath <- here::here();
-dataPath <- here::here();
+workingPath <- here::here("results-intermediate-output");
+dataPath <- here::here("results-data");
 
-################################################################################
+### Specify a vector with datafile names
+datafileNames <- c('alcohol_[PRIVATE].csv',
+                   'condomUse_[PRIVATE].csv',
+                   'exercise_[PRIVATE].csv');
+
+###-----------------------------------------------------------------------------
 ### Load packages
-################################################################################
+###-----------------------------------------------------------------------------
 
 ```
 
-Bla die bla
+```{r load-data}
+
+###-----------------------------------------------------------------------------
+### Load data
+###-----------------------------------------------------------------------------
+
+### Create object to store datafiles
+dat <- list();
+
+### Load datafiles into objects
+for (currentDataset in datafileNames) {
+  ### Read datafile from disk
+  dat[[currentDataset]] <-
+    userfriendlyscience::getData(file.path(dataPath,
+                                           currentDataset), skip=1);
+}
+
+names(dat) <-
+  c("alcohol", "condoms", "exercise");
+
+dat.raw <- dat;
+
+### Delete last variable (Qualtrics apparently ends lines with a comma?)
+dat <-
+  lapply(dat,
+         function(x) {
+           return(x[, names(x) != 'X']);
+         });
+
+### Apply nrow to each list element to see number of rows in the dataframes
+lapply(dat, nrow);
+
+### Sum sample sizes to get total sample size
+sum(unlist(lapply(dat, nrow)));
+
+### Verify ranges for those variables with fixes answer options
+### for each questionnaire (Qualtrics sometimes has odd minimum and
+### maximum values)
+lapply(dat.raw,
+       function(x) {
+         rws <- 16:(ncol(x)-13);
+         x <- ufs::massConvertToNumeric(x[, rws]);
+         lapply(x, range, na.rm=TRUE);
+       });
+
+```
+
+
+```{r rename-data-columns}
+
+###-----------------------------------------------------------------------------
+### Rename variables to a consistent naming scheme
+###-----------------------------------------------------------------------------
+
+names(dat[[1]])[1] <- 'ResponseID ';
+names(dat[[1]])[2] <- 'ResponseSet';
+names(dat[[1]])[3] <- 'Name ';
+names(dat[[1]])[4] <- 'ExternalDataReference  ';
+names(dat[[1]])[5] <- 'EmailAddress  ';
+names(dat[[1]])[6] <- 'IPAddress  ';
+names(dat[[1]])[7] <- 'Status  ';
+names(dat[[1]])[8] <- 'StartDate  ';
+names(dat[[1]])[9] <- 'EndDate ';
+names(dat[[1]])[10] <- 'Finished';
+names(dat[[1]])[11] <- 'informedConsent';
+names(dat[[1]])[12] <- 'age';
+names(dat[[1]])[13] <- 'studyExit';
+names(dat[[1]])[14] <- 'sex';
+names(dat[[1]])[15] <- 'country';
+names(dat[[1]])[16] <- 'selectionAlcohol';
+names(dat[[1]])[17] <- 'negativeresponsSelectionAlcohol';
+names(dat[[1]])[18] <- 'informationAlcohol';
+names(dat[[1]])[19] <- 'Intention_intend';
+names(dat[[1]])[20] <- 'Intention2willing';
+names(dat[[1]])[21] <- 'Intention3expect';
+names(dat[[1]])[22] <- 'curBeh';
+names(dat[[1]])[23] <- 'Attitude_bad_good';
+names(dat[[1]])[24] <- 'Attitude_unpleasant_pleasant';
+names(dat[[1]])[25] <- 'Attitude_harmful_beneficial';
+names(dat[[1]])[26] <- 'Attitude_boring_interesting';
+names(dat[[1]])[27] <- 'Importancescale_unimportant_important';
+names(dat[[1]])[28] <- 'Importancescale_notessential_essential';
+names(dat[[1]])[29] <- 'Importancescale_notsignificant_significant';
+names(dat[[1]])[30] <- 'information';
+names(dat[[1]])[31] <- 'Injunctivenorm_importantpeople';
+names(dat[[1]])[32] <- 'Injunctivenorm_mostpeopleapprove';
+names(dat[[1]])[33] <- 'Descriptivenorm_closefriends';
+names(dat[[1]])[34] <- 'Descriptivenorm_peoplelikeme';
+names(dat[[1]])[35] <- 'Perceivedcontrol_forme';
+names(dat[[1]])[36] <- 'Perceivedcontrol_reallywantto';
+names(dat[[1]])[37] <- 'Perceivedcontrol_confident';
+names(dat[[1]])[38] <- 'information';
+names(dat[[1]])[39] <- 'Selfidentity_rarelythinkabout';
+names(dat[[1]])[40] <- 'SelfidentityRestrainedAlcohol';
+names(dat[[1]])[41] <- 'Selfidentity_kindofperson';
+names(dat[[1]])[42] <- 'Selfidentity_restrainedalcoholimportant';
+names(dat[[1]])[43] <- 'Selfidentity_doingbehaviorimportant';
+names(dat[[1]])[44] <- 'Selfidentity_importantpart';
+names(dat[[1]])[45] <- 'Selfidentity_seemyselfas';
+names(dat[[1]])[46] <- 'Selfidentity_seemyselffollowingthebehaviorguideline';
+names(dat[[1]])[47] <- 'Selfidentity_givingupalcoholdrinking';
+names(dat[[1]])[48] <- 'Selfidentity_restrainedalcoholdrinkingmeansmore';
+names(dat[[1]])[49] <- 'Selfidentity_wrongbehaviormeansmorethanjusttheact';
+names(dat[[1]])[50] <- 'Selfidentity_behaviormeansmoretantheactself';
+names(dat[[1]])[51] <- 'Selfidentity_concernedwithnotdoingthebehaviorenough';
+names(dat[[1]])[52] <- 'Selfidentity_concernedwithdoingtherightbehavior';
+names(dat[[1]])[53] <- 'Selfidentity_wouldfeelatalossgivingupwrongbehavior';
+names(dat[[1]])[54] <- 'information';
+names(dat[[1]])[55] <- 'Past_haveused';
+names(dat[[1]])[56] <- 'Past_howoften';
+names(dat[[1]])[57] <- 'VerificationWorkerID';
+names(dat[[1]])[58] <- 'Endscreen';
+names(dat[[1]])[59] <- 'Browser.Meta.Info.Browser ';
+names(dat[[1]])[60] <- 'Browser.Meta.Info.Version ';
+names(dat[[1]])[61] <- 'Browser.Meta.Info.Operating.System ';
+names(dat[[1]])[62] <- 'Browser.Meta.Info.Screen.Resolution';
+names(dat[[1]])[63] <- 'Browser.Meta.Info.Flash.Version ';
+names(dat[[1]])[64] <- 'Browser.Meta.Info.Java.Support  ';
+names(dat[[1]])[65] <- 'Browser.Meta.Info.User.Agent ';
+names(dat[[1]])[66] <- 'LocationLatitude ';
+names(dat[[1]])[67] <- 'LocationLongitude';
+names(dat[[1]])[68] <- 'LocationAccuracy ';
+
+names(dat[[2]])[1] <- 'ResponseID ';
+names(dat[[2]])[2] <- 'ResponseSet';
+names(dat[[2]])[3] <- 'Name ';
+names(dat[[2]])[4] <- 'ExternalDataReference  ';
+names(dat[[2]])[5] <- 'EmailAddress  ';
+names(dat[[2]])[6] <- 'IPAddress  ';
+names(dat[[2]])[7] <- 'Status  ';
+names(dat[[2]])[8] <- 'StartDate  ';
+names(dat[[2]])[9] <- 'EndDate ';
+names(dat[[2]])[10] <- 'Finished';
+names(dat[[2]])[11] <- 'informedConsent';
+names(dat[[2]])[12] <- 'age';
+names(dat[[2]])[13] <- 'studyExit';
+names(dat[[2]])[14] <- 'sex';
+names(dat[[2]])[15] <- 'country';
+names(dat[[2]])[16] <- 'selectionCondom';
+names(dat[[2]])[17] <- 'studyExit';
+names(dat[[2]])[18] <- 'information';
+names(dat[[2]])[19] <- 'Intention_intend';
+names(dat[[2]])[20] <- 'Intention2willing';
+names(dat[[2]])[21] <- 'Intention3expect';
+names(dat[[2]])[22] <- 'curBeh';
+names(dat[[2]])[23] <- 'Attitude_bad_good';
+names(dat[[2]])[24] <- 'Attitude_unpleasant_pleasant';
+names(dat[[2]])[25] <- 'Attitude_harmful_beneficial';
+names(dat[[2]])[26] <- 'Attitude_boring_interesting';
+names(dat[[2]])[27] <- 'Importancescale_unimportant_important';
+names(dat[[2]])[28] <- 'Importancescale_notessential_essential';
+names(dat[[2]])[29] <- 'Importancescale_notsignificant_significant';
+names(dat[[2]])[30] <- 'information';
+names(dat[[2]])[31] <- 'Injunctivenorm_importantpeople';
+names(dat[[2]])[32] <- 'Injunctivenorm_mostpeopleapprove';
+names(dat[[2]])[33] <- 'Descriptivenorm_closefriends';
+names(dat[[2]])[34] <- 'Descriptivenorm_peoplelikeme';
+names(dat[[2]])[35] <- 'Perceivedcontrol_forme';
+names(dat[[2]])[36] <- 'Perceivedcontrol_reallywantto';
+names(dat[[2]])[37] <- 'Perceivedcontrol_confident';
+names(dat[[2]])[38] <- 'information';
+names(dat[[2]])[39] <- 'Selfidentity_rarelythinkabout';
+names(dat[[2]])[40] <- 'Selfidentity_kindofperson';
+names(dat[[2]])[41] <- 'Selfidentity_importantpart';
+names(dat[[2]])[42] <- 'Selfidentity_doingbehaviorimportant';
+names(dat[[2]])[43] <- 'Selfidentity_seemyselfas';
+names(dat[[2]])[44] <- 'Selfidentity_behaviormeansmoretantheactself';
+names(dat[[2]])[45] <- 'Selfidentity_seemyselffollowingthebehaviorguideline';
+names(dat[[2]])[46] <- 'Selfidentity_concernedwithnotdoingthebehaviorenough';
+names(dat[[2]])[47] <- 'Selfidentity_concernedwithdoingtherightbehavior';
+names(dat[[2]])[48] <- 'Selfidentity_wouldfeelatalossgivingupwrongbehavior';
+names(dat[[2]])[49] <- 'Selfidentity_wrongbehaviormeansmorethanjusttheact';
+names(dat[[2]])[50] <- 'information';
+names(dat[[2]])[51] <- 'Past_haveused';
+names(dat[[2]])[52] <- 'Past_howoften';
+names(dat[[2]])[53] <- 'VerificationWorkerID';
+names(dat[[2]])[54] <- 'Endscreen';
+names(dat[[2]])[55] <- 'Browser.Meta.Info.Browser ';
+names(dat[[2]])[56] <- 'Browser.Meta.Info.Version ';
+names(dat[[2]])[57] <- 'Browser.Meta.Info.Operating.System ';
+names(dat[[2]])[58] <- 'Browser.Meta.Info.Screen.Resolution';
+names(dat[[2]])[59] <- 'Browser.Meta.Info.Flash.Version ';
+names(dat[[2]])[60] <- 'Browser.Meta.Info.Java.Support  ';
+names(dat[[2]])[61] <- 'Browser.Meta.Info.User.Agent ';
+names(dat[[2]])[62] <- 'LocationLatitude ';
+names(dat[[2]])[63] <- 'LocationLongitude';
+names(dat[[2]])[64] <- 'LocationAccuracy ';
+
+names(dat[[3]])[1] <- 'ResponseID ';
+names(dat[[3]])[2] <- 'ResponseSet';
+names(dat[[3]])[3] <- 'Name ';
+names(dat[[3]])[4] <- 'ExternalDataReference  ';
+names(dat[[3]])[5] <- 'EmailAddress  ';
+names(dat[[3]])[6] <- 'IPAddress  ';
+names(dat[[3]])[7] <- 'Status  ';
+names(dat[[3]])[8] <- 'StartDate  ';
+names(dat[[3]])[9] <- 'EndDate ';
+names(dat[[3]])[10] <- 'Finished';
+names(dat[[3]])[11] <- 'informedConsent';
+names(dat[[3]])[12] <- 'age';
+names(dat[[3]])[13] <- 'studyExit';
+names(dat[[3]])[14] <- 'sex';
+names(dat[[3]])[15] <- 'country';
+names(dat[[3]])[16] <- 'information';
+names(dat[[3]])[17] <- 'Intention_intend';
+names(dat[[3]])[18] <- 'Intention2willing';
+names(dat[[3]])[19] <- 'Intention3expect';
+names(dat[[3]])[20] <- 'curBeh';
+names(dat[[3]])[21] <- 'Attitude_bad_good';
+names(dat[[3]])[22] <- 'Attitude_unpleasant_pleasant';
+names(dat[[3]])[23] <- 'Attitude_harmful_beneficial';
+names(dat[[3]])[24] <- 'Attitude_boring_interesting';
+names(dat[[3]])[25] <- 'Importancescale_unimportant_important';
+names(dat[[3]])[26] <- 'Importancescale_notessential_essential';
+names(dat[[3]])[27] <- 'Importancescale_notsignificant_significant';
+names(dat[[3]])[28] <- 'information';
+names(dat[[3]])[29] <- 'Injunctivenorm_importantpeople';
+names(dat[[3]])[30] <- 'Injunctivenorm_mostpeopleapprove';
+names(dat[[3]])[31] <- 'Descriptivenorm_closefriends';
+names(dat[[3]])[32] <- 'Descriptivenorm_peoplelikeme';
+names(dat[[3]])[33] <- 'Perceivedcontrol_forme';
+names(dat[[3]])[34] <- 'Perceivedcontrol_reallywantto';
+names(dat[[3]])[35] <- 'Perceivedcontrol_confident';
+names(dat[[3]])[36] <- 'information';
+names(dat[[3]])[37] <- 'Selfidentity_rarelythinkabout';
+names(dat[[3]])[38] <- 'Selfidentity_kindofperson';
+names(dat[[3]])[39] <- 'Selfidentity_exercisingenoughimportant';
+names(dat[[3]])[40] <- 'Selfidentity_notthinkingaboutexercisingregularly';
+names(dat[[3]])[41] <- 'Selfidentity_seemyselfas';
+names(dat[[3]])[42] <- 'Selfidentity_concernedwithnotdoingthebehaviorenough';
+names(dat[[3]])[43] <- 'Selfidentity_doingbehaviorimportant';
+names(dat[[3]])[44] <- 'Selfidentity_importantpart';
+names(dat[[3]])[45] <- 'Selfidentity_seemyselffollowingthebehaviorguideline';
+names(dat[[3]])[46] <- 'Selfidentity_wouldfeelatalossgivingupwrongbehavior';
+names(dat[[3]])[47] <- 'Selfidentity_lossgivingupexercising';
+names(dat[[3]])[48] <- 'Selfidentity_concernedwithdoingtherightbehavior';
+names(dat[[3]])[49] <- 'Selfidentity_exercisingenoughmeansmore';
+names(dat[[3]])[50] <- 'Selfidentity_wrongbehaviormeansmorethanjusttheact';
+names(dat[[3]])[51] <- 'Selfidentity_behaviormeansmoretantheactself';
+names(dat[[3]])[52] <- 'information';
+names(dat[[3]])[53] <- 'Past_haveused';
+names(dat[[3]])[54] <- 'Past_howoften';
+names(dat[[3]])[55] <- 'VerificationWorkerID';
+names(dat[[3]])[56] <- 'Endscreen';
+names(dat[[3]])[57] <- 'Browser.Meta.Info.Browser ';
+names(dat[[3]])[58] <- 'Browser.Meta.Info.Version ';
+names(dat[[3]])[59] <- 'Browser.Meta.Info.Operating.System ';
+names(dat[[3]])[60] <- 'Browser.Meta.Info.Screen.Resolution';
+names(dat[[3]])[61] <- 'Browser.Meta.Info.Flash.Version ';
+names(dat[[3]])[62] <- 'Browser.Meta.Info.Java.Support  ';
+names(dat[[3]])[63] <- 'Browser.Meta.Info.User.Agent ';
+names(dat[[3]])[64] <- 'LocationLatitude ';
+names(dat[[3]])[65] <- 'LocationLongitude';
+names(dat[[3]])[66] <- 'LocationAccuracy ';
+
+```
+
+```{r recode-data}
+
+###-----------------------------------------------------------------------------
+### Recode the variables
+###-----------------------------------------------------------------------------
+
+### All three behaviors
+dat <-
+  lapply(dat, function(x) {
+    x$Intention_intend <-
+      car::recode(x$Intention_intend, "20=1; 21=2; 22=3; 23=4; 24=5; 25=6; 26=7");
+    x$Intention2willing <-
+      car::recode(x$Intention2willing, "43=1; 44=2; 45=3; 46=4; 47=5; 27=6; 28=7"); 
+    x$Intention3expect <-
+      car::recode(x$Intention3expect, "14=1; 15=2; 16=3; 17=4; 18=5; 19=6; 20=7");
+    x$curBeh <-
+      car::recode(x$curBeh, "9=1; 10=2; 11=3; 12=4; 14=5; 15=6; 16=7");
+    x$Injunctivenorm_importantpeople <-
+      car::recode(x$Injunctivenorm_importantpeople, "40=1; 41=2; 42=3; 43=4; 44=5; 45=6; 46=7; 47=NA");
+    x$Descriptivenorm_peoplelikeme <-
+      car::recode(x$Descriptivenorm_peoplelikeme, "15=1; 16=2; 17=3; 18=4; 19=5; 20=6; 21=7; 22=NA");
+    x$Perceivedcontrol_forme <-
+      car::recode(x$Perceivedcontrol_forme, "22=1; 23=2; 24=3; 25=4; 26=5; 27=6; 28=7");
+    x$Perceivedcontrol_reallywantto <-
+      car::recode(x$Perceivedcontrol_reallywantto, "9=1; 18=2; 10=3; 11=4; 12=5; 13=6; 14=7");
+    x$Past_howoften <-
+      car::recode(x$Past_howoften, "28=1; 29=2; 30=3; 31=4; 32=5; 33=6; 34=7"); 
+    x$Descriptivenorm_closefriends <-
+      car::recode(x$Descriptivenorm_closefriends, "8=NA");
+    x$Injunctivenorm_mostpeopleapprove <-
+      car::recode(x$Injunctivenorm_mostpeopleapprove, "8=NA");
+
+    ##replacing NA with mean (van de gehele variabele of alleen dat item??? - heb nu op item niveau)
+    x$Injunctivenorm_importantpeople[which(is.na(x$Injunctivenorm_importantpeople))]<-
+      mean(x$Injunctivenorm_importantpeople, na.rm = TRUE);
+    x$Descriptivenorm_peoplelikeme[which(is.na(x$Descriptivenorm_peoplelikeme))] <-
+      mean(x$Descriptivenorm_peoplelikeme, na.rm = TRUE);
+    x$Descriptivenorm_closefriends[which(is.na(x$Descriptivenorm_closefriends))] <-
+      mean(x$Descriptivenorm_closefriends, na.rm = TRUE);
+    x$Injunctivenorm_mostpeopleapprove[which(is.na(x$Injunctivenorm_mostpeopleapprove))] <-
+      mean(x$Injunctivenorm_mostpeopleapprove, na.rm = TRUE);
+    
+    return(x);
+  });
+
+### Alcohol only
+ dat[[1]]$selectionAlcohol <-
+   invertItem(dat[[1]]$selectionAlcohol - 9);
+ dat[[1]]$SelfidentityRestrainedAlcohol <-
+   invertItem(dat[[1]]$SelfidentityRestrainedAlcohol);
+ dat[[1]]$Selfidentity_importantpart <-
+   invertItem(dat[[1]]$Selfidentity_importantpart, c(1, 6));
+ dat[[1]]$Selfidentity_givingupalcoholdrinking <-
+   invertItem(dat[[1]]$Selfidentity_givingupalcoholdrinking, c(1, 6));
+ dat[[1]]$Selfidentity_behaviormeansmoretantheactself <-
+   invertItem(dat[[1]]$Selfidentity_behaviormeansmoretantheactself, c(1, 6));
+ 
+### Exercise only
+ dat[[3]]$Selfidentity_notthinkingaboutexercisingregularly <-
+   invertItem(dat[[3]]$Selfidentity_notthinkingaboutexercisingregularly, c(1, 6));
+ dat[[3]]$Selfidentity_exercisingenoughimportant <-
+   invertItem(dat[[3]]$Selfidentity_exercisingenoughimportant, c(1, 6));
+ dat[[3]]$Selfidentity_exercisingenoughmeansmore <-
+   invertItem(dat[[3]]$Selfidentity_exercisingenoughmeansmore, c(1, 6));
+
+```
+
+```{r scale-definitions}
+
+###-----------------------------------------------------------------------------
+### Scale definitions
+###-----------------------------------------------------------------------------
+
+
+
+### Extract from Report.Rmd
+
+
+
+```
+
+
