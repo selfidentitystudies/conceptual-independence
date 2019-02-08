@@ -39,4 +39,7 @@ rsconnect/
 ### Exclude private datafiles (before verification of anonymization)
 *_\[PRIVATE].csv
 
+### Exclude manuscript files
+manuscript/
+
 

@@ -1,0 +1,38 @@
+---
+title: "The Operationalisation of Self-Identity in Reasoned Action Models: Conceptual Independence"
+author: "Marwin H. M. Snippe, Gjalt-Jorn Y. Peters & Gerjo Kok"
+date: "`r format(Sys.time(), '%H:%M:%S on %Y-%m-%d %Z (GMT%z)')`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+      toc_depth: 4
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE);
+knitr::opts_chunk$set(rows.print = 30);
+require(here);
+```
+
+```{r}
+
+######################################################################
+### Paths
+######################################################################
+
+repoPath <- here::here();
+workingPath <- here::here();
+dataPath <- here::here();
+
+################################################################################
+### Load packages
+################################################################################
+
+```
+
+Bla die bla
