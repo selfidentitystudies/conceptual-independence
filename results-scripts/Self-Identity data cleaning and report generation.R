@@ -309,7 +309,7 @@ for (currentScale in names(scales)) {
 nonSIvars <- scales[names(scales) != 'selfIdentity'];
 
 ### Generate abbreviated variable names
-abbr <- abbreviate(names(scales))
+abbr <- abbreviate(names(scales));
 
 ########################################################################
 ########################################################################

@@ -15,13 +15,23 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
+```{r knitr-setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE);
 knitr::opts_chunk$set(rows.print = 30);
-require(here);
 ```
 
-```{r}
+```{r packages-and-paths}
+
+###-----------------------------------------------------------------------------
+### Load packages
+###-----------------------------------------------------------------------------
+
+### Check for presence of packages:
+### - userfriendlyscience
+### - ufs
+### - psych
+### - here
+### - car
 
 ###-----------------------------------------------------------------------------
 ### Paths and files
@@ -31,28 +41,194 @@ repoPath <- here::here();
 workingPath <- here::here("results-intermediate-output");
 dataPath <- here::here("results-data");
 
-### Specify a vector with datafile names
-datafileNames <- c('alcohol_[PRIVATE].csv',
-                   'condomUse_[PRIVATE].csv',
-                   'exercise_[PRIVATE].csv');
-
-###-----------------------------------------------------------------------------
-### Load packages
-###-----------------------------------------------------------------------------
+### Regular expressions that match the private and public datafile names
+privateDataFileRegEx <- '\\[PRIVATE]';
+publicDataFileRegEx <- '\\[PUBLIC]';
 
 ```
+
+
+```{r scale-definitions}
+
+behaviors <-
+  c("alcohol", "condoms", "exercise");
+
+###-----------------------------------------------------------------------------
+### Scale definitions
+###-----------------------------------------------------------------------------
+
+scales <- list();
+
+scales$selfIdentitySelected <- c('Selfidentity_kindofperson',
+                                 'Selfidentity_seemyselfas',
+                                 'Selfidentity_concernedwithdoingtherightbehavior', 
+                                 'Selfidentity_seemyselffollowingthebehaviorguideline');
+
+scales$selfIdentity <- c('Self-identity:\nSomething I\nrarely think about' = 'Selfidentity_rarelythinkabout', 
+                         'Self-identity:\n' = 'Selfidentity_kindofperson',
+                         'Self-identity:\n' = 'Selfidentity_seemyselfas', 
+                         'Self-identity:\n' = 'Selfidentity_concernedwithnotdoingthebehaviorenough', 
+                         'Self-identity:\n' = 'Selfidentity_doingbehaviorimportant', 
+                         'Self-identity:\n' = 'Selfidentity_importantpart', 
+                         'Self-identity:\n' = 'Selfidentity_seemyselffollowingthebehaviorguideline', 
+                         'Self-identity:\n' = 'Selfidentity_wouldfeelatalossgivingupwrongbehavior', 
+                         'Self-identity:\n' = 'Selfidentity_concernedwithdoingtherightbehavior',
+                         'Self-identity:\n' = 'Selfidentity_wrongbehaviormeansmorethanjusttheact', 
+                         'Self-identity:\n' = 'Selfidentity_behaviormeansmoretantheactself');
+
+scales$attitude <- c('Attitude_bad_good', 'Attitude_unpleasant_pleasant',
+                     'Attitude_harmful_beneficial', 'Attitude_boring_interesting');
+
+scales$importance <- c('Importancescale_unimportant_important',
+                       'Importancescale_notessential_essential',
+                       'Importancescale_notsignificant_significant');
+
+scales$attitudeImportance <- c(scales$attitude, scales$importance);
+
+scales$perceivedNorms <- c('Injunctivenorm_importantpeople',
+                           'Injunctivenorm_mostpeopleapprove',
+                           'Descriptivenorm_closefriends',
+                           'Descriptivenorm_peoplelikeme');
+
+scales$pbc <- c('Perceivedcontrol_forme',
+                'Perceivedcontrol_reallywantto',
+                'Perceivedcontrol_confident');
+
+scales$intention <- c('Intention_intend',
+                      'Intention2willing',
+                      'Intention3expect');
+
+scales$pastBehavior <- c('Past_haveused', 'Past_howoften');
+
+scales$currentBehavior <- c('curBeh');
+
+### Specify the items that have to be inverted for all datasets
+invertedItems <- c('Selfidentity_rarelythinkabout',
+                   'Selfidentity_wouldfeelatalossgivingupwrongbehavior');
+
+### Specify measurement models
+measurementModelSpecs <- list();
+for (currentScale in names(scales)) {
+  measurementModelSpecs[[currentScale]] <- paste0(currentScale, ' =~ ',
+                                                  paste0(scales[[currentScale]],
+                                                         collapse=" + "));
+}
+
+### 
+nonSIvars <- scales[names(scales) != 'selfIdentity'];
+
+### Generate abbreviated variable names
+abbr <- abbreviate(names(scales));
+
+```
+
+# Loading and preparing data
+
+## Data anonymizing and loading {.tabset}
+
+### Overview
+
+Please click "Details" to see the code and output for this step in the analysis procedure.
+
+### Details
 
 ```{r load-data}
 
 ###-----------------------------------------------------------------------------
-### Load data
+### Columns that potentially identify participants
 ###-----------------------------------------------------------------------------
+
+### This is 
+identifyingColumns <-
+  list(alcohol = c(1:10, 57:68),
+       condoms = c(1:10, 53:64),
+       exercise = c(1:10, 55:66));
+
+###-----------------------------------------------------------------------------
+### Anonymize data, if necessary
+###-----------------------------------------------------------------------------
+
+### Get a list of all data files in data directory
+privateDataFiles <-
+  list.files(dataPath);
+
+### Select only those matching the regular expression for
+### private data files
+privateDataFiles <-
+  grep(privateDataFileRegEx,
+       privateDataFiles,
+       value=TRUE);
+
+if (length(privateDataFiles) > 0) {
+  ### Private data files are present; this means we run on the PC
+  ### of one of the researchers. That means we should sanitize the
+  ### datasets and prepare them for publishing.
+
+  ### Loop through the files
+  for (currentFilename in privateDataFiles) {
+    
+    ### Run within local, temporary namespace (so that all variables
+    ### are deleted afterwards)
+    local({
+      
+      ### Read this dataset into a temporary, locally stored dataframe
+      dat <-
+        userfriendlyscience::getData(file.path(dataPath,
+                                               currentFilename), skip=1);
+      ufs::cat0("Read data file '", currentFilename, "'.\n");
+
+      ### Identify which columns to use for this datafile
+      currentBehavior <-
+        names(identifyingColumns)[unlist(lapply(names(identifyingColumns),
+                                                grepl,
+                                                currentFilename))];
+      currentIdCols <-
+        identifyingColumns[[currentBehavior]];
+
+      ### Anonymize the potentially identifying columns
+      for (currentVar in currentIdCols) {
+        dat[, currentVar] <-
+          anonymizer::anonymize(dat[, currentVar]);
+      }
+
+      ### Construct new filename to write public version of data to
+      newTmpFilename <- sub(privateDataFileRegEx,
+                            publicDataFileRegEx,
+                            currentFilename);
+      
+      ### Store new datafile
+      write.csv(dat,
+                file.path(dataPath,
+                          newTmpFilename),
+                row.names = FALSE);
+  
+      ufs::cat0("Stored data file '", newTmpFilename, "'.\n");
+  
+    });  ### End local namespace
+  
+  }
+}
+
+###-----------------------------------------------------------------------------
+### Load public datafiles
+###-----------------------------------------------------------------------------
+
+### Get a list of all data files in data directory
+publicDataFiles <-
+  list.files(dataPath);
+
+### Select only those matching the regular expression for
+### private data files
+publicDataFiles <-
+  grep(publicDataFileRegEx,
+       publicDataFiles,
+       value=TRUE);
 
 ### Create object to store datafiles
 dat <- list();
 
 ### Load datafiles into objects
-for (currentDataset in datafileNames) {
+for (currentDataset in publicDataFiles) {
   ### Read datafile from disk
   dat[[currentDataset]] <-
     userfriendlyscience::getData(file.path(dataPath,
@@ -60,9 +236,25 @@ for (currentDataset in datafileNames) {
 }
 
 names(dat) <-
-  c("alcohol", "condoms", "exercise");
+  behaviors;
 
 dat.raw <- dat;
+
+```
+
+## Data cleaning {.tabset}
+
+### Overview
+
+Please click "Details" to see the code and output for this step in the analysis procedure.
+
+### Details
+
+```{r clean-data}
+
+###-----------------------------------------------------------------------------
+### Clean data
+###-----------------------------------------------------------------------------
 
 ### Delete last variable (Qualtrics apparently ends lines with a comma?)
 dat <-
@@ -87,8 +279,18 @@ lapply(dat.raw,
          lapply(x, range, na.rm=TRUE);
        });
 
-```
+###-----------------------------------------------------------------------------
+### Add a unique identifier to every participant
+###-----------------------------------------------------------------------------
 
+for (currentBehav in names(dat)) {
+  dat[[currentBehav]]$id <-
+    paste0(currentBehav,
+           "_",
+           1:nrow(dat[[currentBehav]]));
+}
+
+```
 
 ```{r rename-data-columns}
 
@@ -96,15 +298,18 @@ lapply(dat.raw,
 ### Rename variables to a consistent naming scheme
 ###-----------------------------------------------------------------------------
 
-names(dat[[1]])[1] <- 'ResponseID ';
+### Note that the order of the dataframes (stored in 'behavior') is alcohol,
+### condom use, and exercise.
+
+names(dat[[1]])[1] <- 'ResponseID';
 names(dat[[1]])[2] <- 'ResponseSet';
-names(dat[[1]])[3] <- 'Name ';
-names(dat[[1]])[4] <- 'ExternalDataReference  ';
-names(dat[[1]])[5] <- 'EmailAddress  ';
-names(dat[[1]])[6] <- 'IPAddress  ';
-names(dat[[1]])[7] <- 'Status  ';
-names(dat[[1]])[8] <- 'StartDate  ';
-names(dat[[1]])[9] <- 'EndDate ';
+names(dat[[1]])[3] <- 'Name';
+names(dat[[1]])[4] <- 'ExternalDataReference';
+names(dat[[1]])[5] <- 'EmailAddress';
+names(dat[[1]])[6] <- 'IPAddress';
+names(dat[[1]])[7] <- 'Status';
+names(dat[[1]])[8] <- 'StartDate';
+names(dat[[1]])[9] <- 'EndDate';
 names(dat[[1]])[10] <- 'Finished';
 names(dat[[1]])[11] <- 'informedConsent';
 names(dat[[1]])[12] <- 'age';
@@ -154,25 +359,25 @@ names(dat[[1]])[55] <- 'Past_haveused';
 names(dat[[1]])[56] <- 'Past_howoften';
 names(dat[[1]])[57] <- 'VerificationWorkerID';
 names(dat[[1]])[58] <- 'Endscreen';
-names(dat[[1]])[59] <- 'Browser.Meta.Info.Browser ';
-names(dat[[1]])[60] <- 'Browser.Meta.Info.Version ';
-names(dat[[1]])[61] <- 'Browser.Meta.Info.Operating.System ';
+names(dat[[1]])[59] <- 'Browser.Meta.Info.Browser';
+names(dat[[1]])[60] <- 'Browser.Meta.Info.Version';
+names(dat[[1]])[61] <- 'Browser.Meta.Info.Operating.System';
 names(dat[[1]])[62] <- 'Browser.Meta.Info.Screen.Resolution';
-names(dat[[1]])[63] <- 'Browser.Meta.Info.Flash.Version ';
-names(dat[[1]])[64] <- 'Browser.Meta.Info.Java.Support  ';
-names(dat[[1]])[65] <- 'Browser.Meta.Info.User.Agent ';
-names(dat[[1]])[66] <- 'LocationLatitude ';
+names(dat[[1]])[63] <- 'Browser.Meta.Info.Flash.Version';
+names(dat[[1]])[64] <- 'Browser.Meta.Info.Java.Support';
+names(dat[[1]])[65] <- 'Browser.Meta.Info.User.Agent';
+names(dat[[1]])[66] <- 'LocationLatitude';
 names(dat[[1]])[67] <- 'LocationLongitude';
-names(dat[[1]])[68] <- 'LocationAccuracy ';
+names(dat[[1]])[68] <- 'LocationAccuracy';
 
-names(dat[[2]])[1] <- 'ResponseID ';
+names(dat[[2]])[1] <- 'ResponseID';
 names(dat[[2]])[2] <- 'ResponseSet';
-names(dat[[2]])[3] <- 'Name ';
-names(dat[[2]])[4] <- 'ExternalDataReference  ';
-names(dat[[2]])[5] <- 'EmailAddress  ';
-names(dat[[2]])[6] <- 'IPAddress  ';
-names(dat[[2]])[7] <- 'Status  ';
-names(dat[[2]])[8] <- 'StartDate  ';
+names(dat[[2]])[3] <- 'Name';
+names(dat[[2]])[4] <- 'ExternalDataReference';
+names(dat[[2]])[5] <- 'EmailAddress';
+names(dat[[2]])[6] <- 'IPAddress';
+names(dat[[2]])[7] <- 'Status';
+names(dat[[2]])[8] <- 'StartDate';
 names(dat[[2]])[9] <- 'EndDate ';
 names(dat[[2]])[10] <- 'Finished';
 names(dat[[2]])[11] <- 'informedConsent';
@@ -219,26 +424,26 @@ names(dat[[2]])[51] <- 'Past_haveused';
 names(dat[[2]])[52] <- 'Past_howoften';
 names(dat[[2]])[53] <- 'VerificationWorkerID';
 names(dat[[2]])[54] <- 'Endscreen';
-names(dat[[2]])[55] <- 'Browser.Meta.Info.Browser ';
-names(dat[[2]])[56] <- 'Browser.Meta.Info.Version ';
-names(dat[[2]])[57] <- 'Browser.Meta.Info.Operating.System ';
+names(dat[[2]])[55] <- 'Browser.Meta.Info.Browser';
+names(dat[[2]])[56] <- 'Browser.Meta.Info.Version';
+names(dat[[2]])[57] <- 'Browser.Meta.Info.Operating.System';
 names(dat[[2]])[58] <- 'Browser.Meta.Info.Screen.Resolution';
-names(dat[[2]])[59] <- 'Browser.Meta.Info.Flash.Version ';
-names(dat[[2]])[60] <- 'Browser.Meta.Info.Java.Support  ';
-names(dat[[2]])[61] <- 'Browser.Meta.Info.User.Agent ';
-names(dat[[2]])[62] <- 'LocationLatitude ';
+names(dat[[2]])[59] <- 'Browser.Meta.Info.Flash.Version';
+names(dat[[2]])[60] <- 'Browser.Meta.Info.Java.Support';
+names(dat[[2]])[61] <- 'Browser.Meta.Info.User.Agent';
+names(dat[[2]])[62] <- 'LocationLatitude';
 names(dat[[2]])[63] <- 'LocationLongitude';
-names(dat[[2]])[64] <- 'LocationAccuracy ';
+names(dat[[2]])[64] <- 'LocationAccuracy';
 
-names(dat[[3]])[1] <- 'ResponseID ';
+names(dat[[3]])[1] <- 'ResponseID';
 names(dat[[3]])[2] <- 'ResponseSet';
-names(dat[[3]])[3] <- 'Name ';
-names(dat[[3]])[4] <- 'ExternalDataReference  ';
-names(dat[[3]])[5] <- 'EmailAddress  ';
-names(dat[[3]])[6] <- 'IPAddress  ';
-names(dat[[3]])[7] <- 'Status  ';
-names(dat[[3]])[8] <- 'StartDate  ';
-names(dat[[3]])[9] <- 'EndDate ';
+names(dat[[3]])[3] <- 'Name';
+names(dat[[3]])[4] <- 'ExternalDataReference';
+names(dat[[3]])[5] <- 'EmailAddress';
+names(dat[[3]])[6] <- 'IPAddress';
+names(dat[[3]])[7] <- 'Status';
+names(dat[[3]])[8] <- 'StartDate';
+names(dat[[3]])[9] <- 'EndDate';
 names(dat[[3]])[10] <- 'Finished';
 names(dat[[3]])[11] <- 'informedConsent';
 names(dat[[3]])[12] <- 'age';
@@ -286,18 +491,26 @@ names(dat[[3]])[53] <- 'Past_haveused';
 names(dat[[3]])[54] <- 'Past_howoften';
 names(dat[[3]])[55] <- 'VerificationWorkerID';
 names(dat[[3]])[56] <- 'Endscreen';
-names(dat[[3]])[57] <- 'Browser.Meta.Info.Browser ';
-names(dat[[3]])[58] <- 'Browser.Meta.Info.Version ';
-names(dat[[3]])[59] <- 'Browser.Meta.Info.Operating.System ';
+names(dat[[3]])[57] <- 'Browser.Meta.Info.Browser';
+names(dat[[3]])[58] <- 'Browser.Meta.Info.Version';
+names(dat[[3]])[59] <- 'Browser.Meta.Info.Operating.System';
 names(dat[[3]])[60] <- 'Browser.Meta.Info.Screen.Resolution';
-names(dat[[3]])[61] <- 'Browser.Meta.Info.Flash.Version ';
-names(dat[[3]])[62] <- 'Browser.Meta.Info.Java.Support  ';
-names(dat[[3]])[63] <- 'Browser.Meta.Info.User.Agent ';
-names(dat[[3]])[64] <- 'LocationLatitude ';
+names(dat[[3]])[61] <- 'Browser.Meta.Info.Flash.Version';
+names(dat[[3]])[62] <- 'Browser.Meta.Info.Java.Support';
+names(dat[[3]])[63] <- 'Browser.Meta.Info.User.Agent';
+names(dat[[3]])[64] <- 'LocationLatitude';
 names(dat[[3]])[65] <- 'LocationLongitude';
-names(dat[[3]])[66] <- 'LocationAccuracy ';
+names(dat[[3]])[66] <- 'LocationAccuracy';
 
 ```
+
+## Data recoding {.tabset}
+
+### Overview
+
+Please click "Details" to see the code and output for this step in the analysis procedure.
+
+### Details
 
 ```{r recode-data}
 
@@ -308,6 +521,7 @@ names(dat[[3]])[66] <- 'LocationAccuracy ';
 ### All three behaviors
 dat <-
   lapply(dat, function(x) {
+    ### This is mostly to fix some weird codings from Qualtrics
     x$Intention_intend <-
       car::recode(x$Intention_intend, "20=1; 21=2; 22=3; 23=4; 24=5; 25=6; 26=7");
     x$Intention2willing <-
@@ -326,58 +540,197 @@ dat <-
       car::recode(x$Perceivedcontrol_reallywantto, "9=1; 18=2; 10=3; 11=4; 12=5; 13=6; 14=7");
     x$Past_howoften <-
       car::recode(x$Past_howoften, "28=1; 29=2; 30=3; 31=4; 32=5; 33=6; 34=7"); 
+    
+    ### We still have to decide what to do with people who say "don't know" - currently,
+    ### setting it to 3.9999, which approaches 4, but is still recognizable.
     x$Descriptivenorm_closefriends <-
-      car::recode(x$Descriptivenorm_closefriends, "8=NA");
+      car::recode(x$Descriptivenorm_closefriends, "8=3.9999");
     x$Injunctivenorm_mostpeopleapprove <-
-      car::recode(x$Injunctivenorm_mostpeopleapprove, "8=NA");
+      car::recode(x$Injunctivenorm_mostpeopleapprove, "8=3.9999");
 
-    ##replacing NA with mean (van de gehele variabele of alleen dat item??? - heb nu op item niveau)
-    x$Injunctivenorm_importantpeople[which(is.na(x$Injunctivenorm_importantpeople))]<-
-      mean(x$Injunctivenorm_importantpeople, na.rm = TRUE);
-    x$Descriptivenorm_peoplelikeme[which(is.na(x$Descriptivenorm_peoplelikeme))] <-
-      mean(x$Descriptivenorm_peoplelikeme, na.rm = TRUE);
-    x$Descriptivenorm_closefriends[which(is.na(x$Descriptivenorm_closefriends))] <-
-      mean(x$Descriptivenorm_closefriends, na.rm = TRUE);
-    x$Injunctivenorm_mostpeopleapprove[which(is.na(x$Injunctivenorm_mostpeopleapprove))] <-
-      mean(x$Injunctivenorm_mostpeopleapprove, na.rm = TRUE);
+    # x$Injunctivenorm_importantpeople[which(is.na(x$Injunctivenorm_importantpeople))] <-
+    #   mean(x$Injunctivenorm_importantpeople, na.rm = TRUE);
+    # x$Descriptivenorm_peoplelikeme[which(is.na(x$Descriptivenorm_peoplelikeme))] <-
+    #   mean(x$Descriptivenorm_peoplelikeme, na.rm = TRUE);
+    # x$Descriptivenorm_closefriends[which(is.na(x$Descriptivenorm_closefriends))] <-
+    #   mean(x$Descriptivenorm_closefriends, na.rm = TRUE);
+    # x$Injunctivenorm_mostpeopleapprove[which(is.na(x$Injunctivenorm_mostpeopleapprove))] <-
+    #   mean(x$Injunctivenorm_mostpeopleapprove, na.rm = TRUE);
+    
+    ### Inversions for all datasets
+    x <-
+      userfriendlyscience::invertItems(x, invertedItems);
     
     return(x);
   });
 
 ### Alcohol only
  dat[[1]]$selectionAlcohol <-
-   invertItem(dat[[1]]$selectionAlcohol - 9);
+   userfriendlyscience::invertItem(dat[[1]]$selectionAlcohol - 9);
  dat[[1]]$SelfidentityRestrainedAlcohol <-
-   invertItem(dat[[1]]$SelfidentityRestrainedAlcohol);
+   userfriendlyscience::invertItem(dat[[1]]$SelfidentityRestrainedAlcohol);
  dat[[1]]$Selfidentity_importantpart <-
-   invertItem(dat[[1]]$Selfidentity_importantpart, c(1, 6));
+   userfriendlyscience::invertItem(dat[[1]]$Selfidentity_importantpart, c(1, 6));
  dat[[1]]$Selfidentity_givingupalcoholdrinking <-
-   invertItem(dat[[1]]$Selfidentity_givingupalcoholdrinking, c(1, 6));
+   userfriendlyscience::invertItem(dat[[1]]$Selfidentity_givingupalcoholdrinking, c(1, 6));
  dat[[1]]$Selfidentity_behaviormeansmoretantheactself <-
-   invertItem(dat[[1]]$Selfidentity_behaviormeansmoretantheactself, c(1, 6));
+   userfriendlyscience::invertItem(dat[[1]]$Selfidentity_behaviormeansmoretantheactself, c(1, 6));
  
 ### Exercise only
  dat[[3]]$Selfidentity_notthinkingaboutexercisingregularly <-
-   invertItem(dat[[3]]$Selfidentity_notthinkingaboutexercisingregularly, c(1, 6));
+   userfriendlyscience::invertItem(dat[[3]]$Selfidentity_notthinkingaboutexercisingregularly, c(1, 6));
  dat[[3]]$Selfidentity_exercisingenoughimportant <-
-   invertItem(dat[[3]]$Selfidentity_exercisingenoughimportant, c(1, 6));
+   userfriendlyscience::invertItem(dat[[3]]$Selfidentity_exercisingenoughimportant, c(1, 6));
  dat[[3]]$Selfidentity_exercisingenoughmeansmore <-
-   invertItem(dat[[3]]$Selfidentity_exercisingenoughmeansmore, c(1, 6));
+   userfriendlyscience::invertItem(dat[[3]]$Selfidentity_exercisingenoughmeansmore, c(1, 6));
 
 ```
 
-```{r scale-definitions}
+## Splitting datasets per country {.tabset}
+
+### Overview
+
+Please click "Details" to see the code and output for this step in the analysis procedure.
+
+### Details
+
+```{r split-dataset-per-country}
 
 ###-----------------------------------------------------------------------------
-### Scale definitions
+### Splitting datasets per country
 ###-----------------------------------------------------------------------------
 
-
-
-### Extract from Report.Rmd
-
-
+for (i in behaviors) {
+  dat[[paste0(i, '_us')]] <-
+    dat[[i]][dat[[i]]$country == 1, ];
+  dat[[paste0(i, '_india')]] <-
+    dat[[i]][dat[[i]]$country == 2, ];
+}
 
 ```
 
+## Creating scales {.tabset}
 
+### Overview
+
+Please click "Details" to see the code and output for this step in the analysis procedure.
+
+### Details
+
+```{r make-scales}
+
+###-----------------------------------------------------------------------------
+### Create the scales and add them to the dataframes
+###-----------------------------------------------------------------------------
+
+for (i in names(dat)) {
+  dat[[i]] <-
+    ufs::makeScales(dat[[i]], scales);
+}
+
+### Store dataframes in other object and create new
+### object with only the six separate samples
+datFull <-
+  dat;
+dat <-
+  dat[grepl("_", names(dat))];
+
+```
+
+## Remove excluded, straightlining and careless participants {.tabset}
+
+### Overview
+
+Please click "Details" to see the code and output for this step in the analysis procedure.
+
+### Details
+
+```{r excluding-excluded-straightlining-careless-participants, results="asis"}
+
+###-----------------------------------------------------------------------------
+### Remove participants that were screened out
+###-----------------------------------------------------------------------------
+
+### Participants who were screened out have a non-NA value for 'studyExit'
+for (currentDataset in names(dat)) {
+  dat[[currentDataset]] <-
+    dat[[currentDataset]][is.na(dat[[currentDataset]]$studyExit), ];
+}
+
+
+###-----------------------------------------------------------------------------
+### Detect straightlining and careless participants
+###-----------------------------------------------------------------------------
+
+suspectParticipants <-
+  list();
+
+for (currentDataset in names(dat)) {
+  ### Get a vector with only the numeric variables
+  numericVars <-
+    unlist(lapply(dat[[currentDataset]], is.numeric));
+  ### Store results from the `careless` package functions
+  suspectParticipants[[currentDataset]] <-
+    list(longstring = careless::longstring(dat[[currentDataset]][, numericVars]),
+         irv = careless::irv(dat[[currentDataset]][, numericVars],
+                             split = TRUE,
+                             num.split = 4)
+         ### The mahalanobis function gives an error:
+         ###   Error in solve.default(Sx) : 
+         ###     Lapack routine dgesv: system is exactly singular: U[1,1] = 0
+#         , mahalanobis = careless::mahad(dat[[currentDataset]][, numericVars])
+         );
+  ### Some housecleaning
+  rm(numericVars);
+}
+
+### Show box plots for longstring
+for (currentDataset in names(dat)) {
+  ufs::cat0("\n\n#### Longstring analysis for ", currentDataset, "\n\n");
+  userfriendlyscience::knitFig(
+    userfriendlyscience::ggBoxplot(data.frame(longstring=suspectParticipants[[currentDataset]]$longstring,
+                                              id=dat[[currentDataset]]$id),
+                                   y='longstring'),
+                               figCaption=paste0("Boxplot for longstring in ", currentDataset));
+  longstringThreshold <-
+    min(boxplot(suspectParticipants[[currentDataset]]$longstring)$out);
+  longStringTooHigh <-
+    suspectParticipants[[currentDataset]]$longstring >= longstringThreshold;
+  ufs::cat0("\n\n**Ids of outliers in this boxplot:** ",
+            ufs::vecTxtQ(dat[[currentDataset]][longStringTooHigh, 'id']), "\n\n");
+  ### Some housekeeping
+  rm(longstringThreshold);
+}
+
+### Do something with the IRV
+
+```
+
+## Saving processed data {.tabset}
+
+### Overview
+
+Please click "Details" to see the code and output for this step in the analysis procedure.
+
+### Details
+
+```{r save-processed-data}
+
+###-----------------------------------------------------------------------------
+### Create the scales and add them to the dataframes
+###-----------------------------------------------------------------------------
+
+for (currentDataset in names(dat)) {
+  ### Store new datafile
+  write.csv(dat[[currentDataset]],
+            file.path(dataPath,
+                      paste0(currentDataset, "_processed.csv")),
+            row.names = FALSE);
+  ufs::cat0("Stored data file '", currentDataset, "_processed.csv'.\n");
+}
+
+```
+
+# Descriptives
+
+# Analyses
