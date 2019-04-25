@@ -32,6 +32,16 @@ knitr::opts_chunk$set(rows.print = 30);
 ### - psych
 ### - here
 ### - car
+### - careless
+
+###-----------------------------------------------------------------------------
+### Get most recent versions from GitLab
+###-----------------------------------------------------------------------------
+
+tryCatch(remotes::install_gitlab('r-packages/ufs',
+                                 error=invisible, quiet = TRUE,
+                                 dependencies=FALSE, upgrade=FALSE),
+        error=invisible);
 
 ###-----------------------------------------------------------------------------
 ### Paths and files
@@ -657,7 +667,6 @@ for (currentDataset in names(dat)) {
     dat[[currentDataset]][is.na(dat[[currentDataset]]$studyExit), ];
 }
 
-
 ###-----------------------------------------------------------------------------
 ### Detect straightlining and careless participants
 ###-----------------------------------------------------------------------------
@@ -733,4 +742,49 @@ for (currentDataset in names(dat)) {
 
 # Descriptives
 
+
+
+
 # Analyses
+
+## Conceptual Independence Matrices {.tabset .tabset-pill}
+
+```{r CIM}
+
+for (currentDataset in names(dat)) {
+  cat("\n\n###", currentDataset, "\n\n");
+  tryCatch(
+    ufs::CIM(data = dat[[currentDataset]],
+             scales=scales,
+             skipRegex = c("^attitude$|^importance$",
+                           "^attitudeImportance$"),
+             outputFile = file.path(workingPath,
+                                    paste0(currentDataset, ".png"))),
+    error = function(e) {
+      cat("\n\nEncountered error:\v  ",
+          e$message,
+          "\n\n");
+    });
+}
+
+```
+
+
+
+<!---------------------------------------------------------------------------->
+<!-- Relocating table of contents and tweaking some styles
+<!---------------------------------------------------------------------------->
+
+<script>
+// Move TOC to the Table of Contents heading (with id "contents")
+$(function() {
+  $( "#TOC" ).insertAfter( $( "#contents" ) );
+});
+</script>
+
+<style>
+.svg-figure {
+  width: 100%;
+}
+</style>
+
