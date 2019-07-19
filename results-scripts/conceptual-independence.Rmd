@@ -726,7 +726,7 @@ Please click "Details" to see the code and output for this step in the analysis 
 ```{r save-processed-data}
 
 ###-----------------------------------------------------------------------------
-### Create the scales and add them to the dataframes
+### Store processed datafile for easy access for others
 ###-----------------------------------------------------------------------------
 
 for (currentDataset in names(dat)) {
@@ -742,17 +742,53 @@ for (currentDataset in names(dat)) {
 
 # Descriptives
 
+## Scale diagnostics {.tabset}
+
+These are extensive scale diagnostics, presented separately for each dataset and within each dataset, separately for each scale. Use the tabs to navigate.
+
+```{r scale-diagnostics, results="asis"}
+
+###-----------------------------------------------------------------------------
+### Order scale diagnostics
+###-----------------------------------------------------------------------------
+
+for (currentDataset in names(dat)) {
+  ufs::cat0("\n\n### ", currentDataset, " {.tabset}\n\n");
+  for (currentScale in names(scales)) {
+    if (length(scales[[currentScale]]) > 1) {
+      ufs::cat0("\n\n#### ", currentScale, "\n\n");
+      knitr::knit_print(ufs::scaleDiagnosis(data = dat[[currentDataset]],
+                                            items = scales[[currentScale]]),
+                        headingLevel=5);
+    }
+  }
+}
+
+```
+
 
 
 
 # Analyses
+
+## Factor analysis of self-identity {.tabset}
+
+```{r self-identity-factor-analyses}
+for (currentDataset in names(dat)) {
+  ufs::cat0("\n\n### ", currentDataset, "\n\n");
+  userfriendlyscience::fullFact(dat[[currentDataset]],
+                                items=unname(scales$selfIdentity));
+}
+ufs::cat0("\n\n### Warnings\n\n");
+print(warnings());
+```
 
 ## Conceptual Independence Matrices {.tabset .tabset-pill}
 
 ```{r CIM}
 
 for (currentDataset in names(dat)) {
-  cat("\n\n###", currentDataset, "\n\n");
+  ufs::cat0("\n\n### ", currentDataset, "\n\n");
   tryCatch(
     ufs::CIM(data = dat[[currentDataset]],
              scales=scales,
